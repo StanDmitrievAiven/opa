@@ -1,11 +1,12 @@
-# Local / VM: OPA + optional DataHub→catalog sync.
+# Local / VM: single container = OPA + optional built-in DataHub sync.
 #
-#   docker compose up -d
-#   docker compose --profile sync up -d
+#   cp .env.example .env
+#   # optional: set DATAHUB_GMS_URL (+ DATAHUB_TOKEN) in .env
+#   docker compose up -d --build
 #
 # Trino ([trinostate](https://github.com/StanDmitrievAiven/trinostate)) env:
-#   OPA_POLICY_URI=http://host.docker.internal:8181/v1/data/trino/allow   # example
-#   OPA_POLICY_BATCHED_URI=http://host.docker.internal:8181/v1/data/trino/batch
+#   OPA_POLICY_URI=https://host/v1/data/trino/allow
+#   OPA_POLICY_BATCHED_URI=https://host/v1/data/trino/batch
 
 services:
   opa:
@@ -14,26 +15,11 @@ services:
     environment:
       PORT: "${PORT:-8181}"
       OPA_LOG_LEVEL: "${OPA_LOG_LEVEL:-info}"
+      DATAHUB_GMS_URL: "${DATAHUB_GMS_URL:-}"
+      DATAHUB_TOKEN: "${DATAHUB_TOKEN:-}"
+      SYNC_INTERVAL_SECONDS: "${SYNC_INTERVAL_SECONDS:-120}"
     ports:
       - "${OPA_PUBLISH:-8181}:${PORT:-8181}"
-    # Mount so `docker compose --profile sync` can refresh catalog.json without rebuild.
     volumes:
       - ./data:/data
       - ./policies:/policies:ro
-
-  datahub-opa-sync:
-    profiles: ["sync"]
-    image: python:3.11-alpine
-    restart: unless-stopped
-    depends_on:
-      opa:
-        condition: service_started
-    environment:
-      DATAHUB_GMS_URL: ${DATAHUB_GMS_URL:-http://localhost:8080}
-      DATAHUB_TOKEN: ${DATAHUB_TOKEN:-}
-      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-120}
-    volumes:
-      - ./scripts/sync_datahub_to_opa.py:/app/sync_datahub_to_opa.py:ro
-      - ./scripts/sync_loop.sh:/app/sync_loop.sh:ro
-      - ./data:/out
-    command: ["sh", "/app/sync_loop.sh"]

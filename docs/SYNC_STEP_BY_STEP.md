@@ -1,8 +1,22 @@
 # Step 2 for beginners: DataHub → `catalog.json` → OPA
 
-You already pointed **Trino** at OPA (step 1). Step 2 is only: **copy governance from DataHub into the JSON file OPA reads**, then **ship that file** to your running OPA app.
+You already pointed **Trino** at OPA (step 1). Step 2 is only: **copy governance from DataHub into the JSON file OPA reads** (`catalog.json`). The **OPA binary** still never calls DataHub; either a **script on your laptop** or a **background job inside the OPA container** does.
 
-OPA does **not** log into DataHub by itself. A small script does that once per run.
+---
+
+## Easiest on Aiven: env vars only (built into the image)
+
+On **Aiven App Runtime**, set these on the **OPA** application (use **secrets** for the token):
+
+| Variable | Purpose |
+|----------|---------|
+| **`DATAHUB_GMS_URL`** | Your GMS base URL (`https://…`) — **no** `/api/graphql`. **Must be reachable from the OPA container** (same VPC / public URL). |
+| **`DATAHUB_TOKEN`** | If GMS requires auth — optional otherwise. |
+| **`SYNC_INTERVAL_SECONDS`** | Optional; default **120** seconds between refreshes. |
+
+Then **redeploy**. The container runs OPA **and** a small Python loop that keeps **`/data/catalog.json`** up to date; OPA reloads it automatically.
+
+If **`DATAHUB_GMS_URL`** is **empty**, sync stays off and OPA uses only the `catalog.json` from the Docker build.
 
 ---
 
@@ -78,16 +92,16 @@ Keys are **`catalog.schema.table`** in lowercase.
 
 ---
 
-## C. Put the new file on your Aiven OPA app
+## C. Put the new file on your Aiven OPA app (only if you are **not** using built-in sync)
 
-Your OPA container was **built with** `data/catalog.json` inside the image. Updating governance means **shipping a new file + new deploy**:
+If you **did** set **`DATAHUB_GMS_URL`** on Aiven, skip this — the container updates `catalog.json` for you.
 
-1. **Commit and push** the updated `data/catalog.json` to the `opa` GitHub repo (same repo Aiven builds from).
-2. In **Aiven**, **redeploy** the OPA application so it rebuilds the image (or runs your pipeline).
+Otherwise your image only has the **baked-in** `data/catalog.json`. Then:
 
-After deploy, OPA’s `--watch` will see the new JSON and reload.
+1. **Commit and push** the updated `data/catalog.json` to the `opa` GitHub repo.
+2. **Redeploy** the OPA app so the image rebuilds.
 
-**When to repeat:** whenever you change tags, owners, or column rules in DataHub — run the script again, commit, redeploy (or automate that in CI later).
+**When to repeat (manual path):** after every meaningful DataHub UI change, unless you switch to the env-var sync above.
 
 ---
 
