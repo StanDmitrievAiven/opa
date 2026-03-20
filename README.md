@@ -51,6 +51,8 @@ docker compose --profile sync up -d --build
 
 ## One-off sync (no compose)
 
+**New to this?** Follow [docs/SYNC_STEP_BY_STEP.md](docs/SYNC_STEP_BY_STEP.md).
+
 ```bash
 export DATAHUB_GMS_URL=https://your-gms-host
 export DATAHUB_TOKEN=...   # if required
@@ -68,7 +70,7 @@ python3 scripts/sync_datahub_to_opa.py -o data/catalog.json
 ## Repo layout
 
 ```
-├── Dockerfile              # OPA + baked policies + data/catalog.json
+├── Dockerfile              # Multi-stage: official OPA binary + Debian (shell + PORT)
 ├── entrypoint.sh           # Honors PORT (Aiven) and OPA_LOG_LEVEL
 ├── policies/trino.rego     # Catalog-driven rules
 ├── data/catalog.json       # Governance snapshot (from DataHub sync)
